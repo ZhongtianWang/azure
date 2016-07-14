@@ -1,3 +1,4 @@
+// This example lists all Linux Pay-as-you-go VM Pricing in USD for all US VMs.
 package main
 
 import (
@@ -24,6 +25,12 @@ type credentials struct {
 	ClientSecret   string `json:"clientSecret"`
 	TenantID       string `json:"tenantID"`
 	SubscriptionID string `json:"subscriptionID"`
+}
+
+type rate struct {
+	size   string
+	price  float32
+	region string
 }
 
 func withInspection() autorest.PrepareDecorator {
@@ -86,10 +93,32 @@ func main() {
 		log.Fatalf("Error: %v", err)
 	}
 
-	client := ratecard.NewClient(cred.SubscriptionID)
-	client.Authorizer = spt
-	client.RequestInspector = withInspection()
-	client.ResponseInspector = byInspecting()
+	rateCardClient := ratecard.NewClient(cred.SubscriptionID)
+	rateCardClient.Authorizer = spt
+
+	// Uncomment to inspect http request and responses
+	// rateCardClient.RequestInspector = withInspection()
+	// rateCardClient.ResponseInspector = byInspecting()
+
+	// List all Linux only Pay-as-you-go VM Pricing in USD for all US VMs.
+	linuxVms := []string{"BASIC.A0", "BASIC.A1", "BASIC.A2", "BASIC.A3", "BASIC.A4",
+		"A0", "A1", "A2", "A3", "A4", "A5", "A6", "A7", "A8", "A9", "Standard_D1",
+		"Standard_D11", "Standard_D11_v2", "Standard_D12", "Standard_D12_v2",
+		"Standard_D13", "Standard_D13_v2", "Standard_D14", "Standard_D14_v2",
+		"Standard_D1_v2", "Standard_D2", "Standard_D2_v2", "Standard_D3",
+		"Standard_D3_v2", "Standard_D4", "Standard_D4_v2", "Standard_D5_v2",
+		"Standard_DS1", "Standard_DS11", "Standard_DS12", "Standard_DS13",
+		"Standard_DS14", "Standard_DS2", "Standard_DS3", "Standard_DS4",
+		"Standard_G1", "Standard_G2", "Standard_G3", "Standard_G4", "Standard_G5",
+		"Standard_GS1", "Standard_GS2", "Standard_GS3", "Standard_GS4", "Standard_GS5"}
+
+	// The current RateCard API returns weird response. To filter out only Linux VMs, We
+	// create a map that maps the API formatted size tyoes to the actual ones.
+	filterSet := make(map[string]string)
+	for _, size := range linuxVms {
+		meterSize := fmt.Sprintf("%s VM", size)
+		filterSet[meterSize] = size
+	}
 
 	param := ratecard.RateCardGetParameters{
 		OfferDurableId: stringPtr("MS-AZR-0003p"),
@@ -98,23 +127,39 @@ func main() {
 		RegionInfo:     stringPtr("US"),
 	}
 
-	rateCard, err := client.Get(param, make(chan struct{}))
+	rateCard, err := rateCardClient.Get(param, make(chan struct{}))
 	if err != nil {
 		log.Fatalf("Error: %v", err)
 	}
 
-	log.Println("Meters:")
+	// API response includes outdated information as well. We keep track of effective
+	// date to make sure we get the latest result possible.
+	result := []rate{}
+
 	for _, meter := range *rateCard.Meters {
-		log.Println("MeterId: ", *meter.MeterId)
-		log.Println("MeterCategory: ", *meter.MeterCategory)
-		log.Println("MeterSubCategory: ", *meter.MeterSubCategory)
-		log.Println("Unit: ", *meter.Unit)
-		log.Println("MeterRates:")
-		for quantity, rate := range *meter.MeterRates {
-			log.Println(quantity, ":", *rate)
+		if *meter.MeterCategory != ratecard.VirtualMachines {
+			continue
 		}
-		log.Println("EffectiveDate: ", *meter.EffectiveDate)
-		log.Println("IncludedQuantity: ", *meter.IncludedQuantity)
+
+		meterSize := *meter.MeterSubCategory
+		price := *(*meter.MeterRates)["0"]
+		region := *meter.MeterRegion
+
+		// Filter out Linux VMs.
+		size, ok := filterSet[meterSize]
+		if !ok {
+			continue
+		}
+
+		result = append(result, rate{
+			size:   size,
+			price:  price,
+			region: region,
+		})
+	}
+
+	for _, rate := range result {
+		log.Printf("Region: %s. Price: %f. Size: %s.\n", rate.region, rate.price, rate.size)
 	}
 }
 
