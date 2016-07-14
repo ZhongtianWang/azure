@@ -19,7 +19,6 @@ type RateCard struct {
 	Currency          *string        `json:"Currency,omitempty"`
 	Locale            *string        `json:"Locale,omitempty"`
 	IsTaxIncluded     *bool          `json:"IsTaxIncluded,omitempty"`
-	MeterRegion       *string        `json:"MeterRegion,omitempty"`
 	Tags              *[]string      `json:"Tags,omitempty"`
 }
 
@@ -29,6 +28,7 @@ type Meters struct {
 	MeterCategory     *MeterCategory       `json:"MeterCategory,omitempty"`
 	MeterSubCategory  *string              `json:"MeterSubCategory,omitempty"`
 	Unit              *string              `json:"Unit,omitempty"`
+	MeterRegion       *string              `json:"MeterRegion,omitempty"`
 	MeterRates        *map[string]*float32 `json:"MeterRates,omitempty"`
 	EffectiveDate     *string              `json:"EffectiveDate,omitempty"`
 	IncludedQuantity  *float32             `json:"IncludedQuantity,omitempty"`
