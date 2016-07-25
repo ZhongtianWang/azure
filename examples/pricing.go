@@ -11,6 +11,7 @@ import (
 	"net/http"
 	"os"
 	"os/user"
+	"sort"
 
 	"github.com/Azure/azure-sdk-for-go/arm/compute"
 	"github.com/Azure/go-autorest/autorest"
@@ -261,9 +262,35 @@ func main() {
 		}
 	}
 
-	for _, rate := range result {
-		log.Printf("%v.\n", rate)
+	// For prettier output, sort result by vm size.
+	allVMSizesSorted := []string{}
+	for _, size := range linuxVms {
+		allVMSizesSorted = append(allVMSizesSorted, size)
 	}
+	sort.Strings(allVMSizesSorted)
+
+	// For prettier output, sort region too.
+	allRegionsSorted := []string{}
+	for _, region := range usLocations {
+		allRegionsSorted = append(allRegionsSorted, region)
+	}
+	sort.Strings(allRegionsSorted)
+
+	// Produce result for quilt.
+	strResult := ""
+	for _, backSize := range allVMSizesSorted {
+		for _, region := range allRegionsSorted {
+			k := id{
+				size:   backSize,
+				region: region,
+			}
+			if rate, ok := result[k]; ok {
+				strResult += fmt.Sprintf("{Size :\"%s\", CPU: %d, RAM: %f, Disk: \"%d\", Region: \"%s\", Price: %f},\n", rate.size, rate.cpu, rate.ram, rate.disk, rate.region, rate.price)
+			}
+		}
+	}
+
+	log.Println(strResult)
 
 }
 
